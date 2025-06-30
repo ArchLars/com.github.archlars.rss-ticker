@@ -5,6 +5,7 @@ ConfigModel {
     ConfigCategory {
         name: "General"
         icon: "configure"
-        source: "configGeneral.qml"
+        // Load page from contents/ui
+        source: "../contents/ui/configGeneral.qml"
     }
 }
