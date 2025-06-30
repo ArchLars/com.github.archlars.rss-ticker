@@ -33,6 +33,11 @@ PlasmoidItem {
     property bool fadeInProgress: false
     property int hoveredHeadlineIndex: -1  // Track which headline is being hovered (-1 = none)
     property int pressedHeadlineIndex: -1  // Track index pressed for more accurate clicks
+    // References to internal items needed by helper functions
+    property Item contentAreaRef: null
+    property Item marqueeContainerRef: null
+    property var marqueeAnimationRef: null
+    property var fadeOutAnimationRef: null
 
     // Debug loading state changes
     onIsLoadingChanged: {
@@ -103,10 +108,10 @@ PlasmoidItem {
     }
 
     function handleDateChange() {
-        if (fadeEnabled && !fadeInProgress) {
+        if (fadeEnabled && !fadeInProgress && fadeOutAnimationRef) {
             console.log("[RSS-Ticker] Starting fade transition for date change")
             fadeInProgress = true
-            fadeOutAnimation.start()
+            fadeOutAnimationRef.start()
         } else {
             fetchRSSFeed()
         }
@@ -195,28 +200,32 @@ PlasmoidItem {
             console.log("[RSS-Ticker] Cannot restart animation - no content")
             return
         }
+        if (!marqueeAnimationRef || !marqueeContainerRef || !contentAreaRef) {
+            console.log("[RSS-Ticker] Animation references not ready")
+            return
+        }
 
         // Stop current animation completely
-        marqueeAnimation.stop()
+        marqueeAnimationRef.stop()
 
         // Reset position immediately
-        marqueeContainer.x = contentArea.width
+        marqueeContainerRef.x = contentAreaRef.width
 
         // Calculate new duration with current dimensions
-        var availableWidth = contentArea.width > 0 ? contentArea.width : 400
+        var availableWidth = contentAreaRef.width > 0 ? contentAreaRef.width : 400
         var newDuration = Math.max(1000, (totalTextWidth + availableWidth) * 1000 / scrollSpeed)
 
         console.log("[RSS-Ticker] Animation parameters - Width:", availableWidth, "Total:", totalTextWidth, "Duration:", newDuration, "ms")
 
         // Apply new settings and restart
-        marqueeAnimation.duration = newDuration
-        marqueeAnimation.from = availableWidth
-        marqueeAnimation.to = -totalTextWidth
+        marqueeAnimationRef.duration = newDuration
+        marqueeAnimationRef.from = availableWidth
+        marqueeAnimationRef.to = -totalTextWidth
 
         // Use timer to ensure clean restart
         Qt.callLater(function() {
             if (!fadeInProgress) {
-                marqueeAnimation.start()
+                marqueeAnimationRef.start()
                 console.log("[RSS-Ticker] Animation restarted successfully")
             }
         })
@@ -280,6 +289,13 @@ PlasmoidItem {
     fullRepresentation: Item {
         Layout.fillWidth: true
         Layout.fillHeight: true
+
+        Component.onCompleted: {
+            root.contentAreaRef = contentArea
+            root.marqueeContainerRef = marqueeContainer
+            root.marqueeAnimationRef = marqueeAnimation
+            root.fadeOutAnimationRef = fadeOutAnimation
+        }
 
         // Inset background frame
         KSvg.FrameSvgItem {
