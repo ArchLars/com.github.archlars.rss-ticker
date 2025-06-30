@@ -237,24 +237,24 @@ PlasmoidItem {
     }
 
     function getHeadlineIndexAtPosition(xPos) {
-        if (headlines.length === 0) return -1
+        if (headlines.length === 0 || xPos < 0) return -1
 
-            var accumulatedWidth = 0
-            var separator = "    •    "
+        var accumulatedWidth = 0
+        var separator = "    •    "
 
-            for (var i = 0; i < headlines.length; i++) {
-                textMetrics.text = headlines[i].title
-                var headlineWidth = textMetrics.width
+        for (var i = 0; i < headlines.length; i++) {
+            textMetrics.text = headlines[i].title
+            var headlineWidth = textMetrics.width
 
-                if (xPos >= accumulatedWidth && xPos <= accumulatedWidth + headlineWidth) {
-                    return i
-                }
-
-                accumulatedWidth += headlineWidth
-                textMetrics.text = separator
-                accumulatedWidth += textMetrics.width
+            if (xPos >= accumulatedWidth && xPos <= accumulatedWidth + headlineWidth) {
+                return i
             }
-            return -1
+
+            accumulatedWidth += headlineWidth
+            textMetrics.text = separator
+            accumulatedWidth += textMetrics.width
+        }
+        return -1
     }
 
     function generateFormattedText() {
@@ -375,12 +375,14 @@ PlasmoidItem {
                                 onPressed: {
                                     if (headlines.length === 0) return
 
-                                    pressedHeadlineIndex = getHeadlineIndexAtPosition(mouse.x)
+                                    var adjustedX = mouse.x - marqueeContainer.x
+                                    pressedHeadlineIndex = getHeadlineIndexAtPosition(adjustedX)
                                 }
 
                             onPositionChanged: {
                                 if (containsMouse) {
-                                    var newHoveredIndex = getHeadlineIndexAtPosition(mouseX)
+                                    var adjustedX = mouseX - marqueeContainer.x
+                                    var newHoveredIndex = getHeadlineIndexAtPosition(adjustedX)
                                     if (newHoveredIndex !== hoveredHeadlineIndex) {
                                         hoveredHeadlineIndex = newHoveredIndex
                                         console.log("[RSS-Ticker] Hovering over headline index:", hoveredHeadlineIndex)
@@ -403,7 +405,8 @@ PlasmoidItem {
                                 pressedHeadlineIndex = -1
 
                                 if (index === -1) {
-                                    index = getHeadlineIndexAtPosition(mouse.x)
+                                    var adjustedX = mouse.x - marqueeContainer.x
+                                    index = getHeadlineIndexAtPosition(adjustedX)
                                 }
 
                                 if (index !== -1) {
