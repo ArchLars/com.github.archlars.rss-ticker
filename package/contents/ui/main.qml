@@ -31,6 +31,7 @@ PlasmoidItem {
     property int currentHeadlineIndex: 0
     property real totalTextWidth: 0
     property bool fadeInProgress: false
+    property int hoveredHeadlineIndex: -1  // Track which headline is being hovered (-1 = none)
 
     // Debug loading state changes
     onIsLoadingChanged: {
@@ -48,6 +49,14 @@ PlasmoidItem {
     onPreferredWidgetWidthChanged: {
         Layout.preferredWidth = preferredWidgetWidth
         console.log("[RSS-Ticker] Widget width changed to:", preferredWidgetWidth, "actual Layout.preferredWidth:", Layout.preferredWidth)
+    }
+
+    // Update text formatting when hover state changes
+    onHoveredHeadlineIndexChanged: {
+        if (headlines.length > 0) {
+            // Force text update when hover state changes
+            headlineText.text = generateFormattedText()
+        }
     }
 
     toolTipMainText: "RSS News Ticker"
@@ -165,19 +174,17 @@ PlasmoidItem {
             return
         }
 
-        // Calculate total width including separators
-        var width = 0
-        for (var i = 0; i < headlines.length; i++) {
-            textMetrics.text = headlines[i].title
-            width += textMetrics.width
-            
-            // Add separator width
-            textMetrics.text = "    •    "
-            width += textMetrics.width
-        }
+        // Create combined text to measure (plain text for width calculation)
+        var combinedText = headlines.map(function(headline) {
+            return headline.title
+        }).join("    •    ") + "    •    "
 
-        totalTextWidth = width
+        textMetrics.text = combinedText
+        totalTextWidth = textMetrics.width
         console.log("[RSS-Ticker] Calculated total text width:", totalTextWidth, "px")
+
+        // Reset hover state when content changes
+        hoveredHeadlineIndex = -1
     }
 
     function restartAnimationWithNewSpeed() {
@@ -217,6 +224,48 @@ PlasmoidItem {
     function openLink(url) {
         console.log("[RSS-Ticker] Opening link:", url)
         Qt.openUrlExternally(url)
+    }
+
+    function getHeadlineIndexAtPosition(xPos) {
+        if (headlines.length === 0) return -1
+
+            var accumulatedWidth = 0
+            var separator = "    •    "
+
+            for (var i = 0; i < headlines.length; i++) {
+                textMetrics.text = headlines[i].title
+                var headlineWidth = textMetrics.width
+
+                if (xPos >= accumulatedWidth && xPos <= accumulatedWidth + headlineWidth) {
+                    return i
+                }
+
+                accumulatedWidth += headlineWidth
+                textMetrics.text = separator
+                accumulatedWidth += textMetrics.width
+            }
+            return -1
+    }
+
+    function generateFormattedText() {
+        if (headlines.length === 0) {
+            return "Loading headlines..."
+        }
+
+        var formattedParts = []
+        for (var i = 0; i < headlines.length; i++) {
+            var title = headlines[i].title
+            // Escape HTML characters to prevent formatting issues
+            title = title.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+
+            if (hoveredHeadlineIndex === i) {
+                // Use HTML to underline only the hovered headline
+                formattedParts.push('<u>' + title + '</u>')
+            } else {
+                formattedParts.push(title)
+            }
+        }
+        return formattedParts.join("    •    ") + "    •    "
     }
 
     // Text metrics for width calculation - optimized font metrics
@@ -275,108 +324,69 @@ PlasmoidItem {
                         }
                     }
 
-                    // Row layout for individual headline components
-                    Row {
-                        id: headlineRow
+                    // Headlines text with optimized vertical positioning
+                    Text {
+                        id: headlineText
+                        width: parent.width
                         height: parent.height
-                        spacing: 0
+                        color: Kirigami.Theme.textColor  // Use theme-aware color
+                        font.pixelSize: 11  // Reduced for better vertical fit
+                        font.weight: Font.Medium  // Keep consistent weight
+                        font.family: "Sans Serif"
 
-                        // Create individual headline items
-                        Repeater {
-                            model: headlines
+                        // Critical: Use proper vertical alignment for panel widgets
+                        verticalAlignment: Text.AlignVCenter
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.verticalCenterOffset: -1  // Fine-tune vertical position
 
-                            delegate: Row {
-                                height: parent.height
-                                spacing: 0
+                        // Enable rich text for individual headline underlining
+                        textFormat: Text.RichText
 
-                                // Individual headline component
-                                Item {
-                                    height: parent.height
-                                    width: headlineTextElement.width
+                        // Rendering optimizations
+                        renderType: Text.NativeRendering
+                        antialiasing: true
 
-                                    Text {
-                                        id: headlineTextElement
-                                        height: parent.height
-                                        color: headlineMouseArea.containsMouse ? Qt.lighter(Kirigami.Theme.textColor, 1.2) : Kirigami.Theme.textColor
-                                        font.pixelSize: 11
-                                        font.weight: headlineMouseArea.containsMouse ? Font.DemiBold : Font.Medium
-                                        font.family: "Sans Serif"
-                                        font.underline: headlineMouseArea.containsMouse
+                        text: generateFormattedText()
 
-                                        // Critical: Use proper vertical alignment
-                                        verticalAlignment: Text.AlignVCenter
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        anchors.verticalCenterOffset: -1
+                        // Enhanced mouse handling with individual headline hover detection
+                        MouseArea {
+                            id: headlineMouseArea
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            hoverEnabled: true
 
-                                        // Rendering optimizations
-                                        renderType: Text.NativeRendering
-                                        antialiasing: true
-
-                                        text: modelData.title
-
-                                        // Smooth transitions for hover effects
-                                        Behavior on color {
-                                            ColorAnimation { duration: 150 }
-                                        }
-
-                                        MouseArea {
-                                            id: headlineMouseArea
-                                            anchors.fill: parent
-                                            cursorShape: Qt.PointingHandCursor
-                                            hoverEnabled: true
-
-                                            onClicked: {
-                                                console.log("[RSS-Ticker] Clicked headline:", modelData.title)
-                                                openLink(modelData.link)
-                                            }
-                                        }
+                            onPositionChanged: {
+                                if (containsMouse) {
+                                    var newHoveredIndex = getHeadlineIndexAtPosition(mouseX)
+                                    if (newHoveredIndex !== hoveredHeadlineIndex) {
+                                        hoveredHeadlineIndex = newHoveredIndex
+                                        console.log("[RSS-Ticker] Hovering over headline index:", hoveredHeadlineIndex)
                                     }
                                 }
+                            }
 
-                                // Separator (only if not the last item)
-                                Text {
-                                    visible: index < headlines.length - 1
-                                    height: parent.height
-                                    color: Kirigami.Theme.textColor
-                                    font.pixelSize: 11
-                                    font.weight: Font.Medium
-                                    font.family: "Sans Serif"
-                                    verticalAlignment: Text.AlignVCenter
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    anchors.verticalCenterOffset: -1
-                                    renderType: Text.NativeRendering
-                                    antialiasing: true
-                                    text: "    •    "
+                            onExited: {
+                                if (hoveredHeadlineIndex !== -1) {
+                                    hoveredHeadlineIndex = -1
+                                    console.log("[RSS-Ticker] Mouse exited, clearing hover")
                                 }
                             }
-                        }
 
-                        // Add one more separator at the end for seamless loop
-                        Text {
-                            height: parent.height
-                            color: Kirigami.Theme.textColor
-                            font.pixelSize: 11
-                            font.weight: Font.Medium
-                            font.family: "Sans Serif"
-                            verticalAlignment: Text.AlignVCenter
-                            anchors.verticalCenter: parent.verticalCenter
-                            anchors.verticalCenterOffset: -1
-                            renderType: Text.NativeRendering
-                            antialiasing: true
-                            text: "    •    "
+                            onClicked: function(mouse) {
+                                if (headlines.length === 0) return
+
+                                    var clickedIndex = getHeadlineIndexAtPosition(mouse.x)
+                                    if (clickedIndex !== -1) {
+                                        console.log("[RSS-Ticker] Clicked on headline", clickedIndex + 1, ":", headlines[clickedIndex].title)
+                                        openLink(headlines[clickedIndex].link)
+                                    } else if (headlines.length > 0) {
+                                        // Fallback - open first headline
+                                        console.log("[RSS-Ticker] Default click action - opening first headline")
+                                        openLink(headlines[0].link)
+                                    }
+                            }
                         }
                     }
-                }
-
-                // Loading text for when headlines are empty
-                Text {
-                    visible: headlines.length === 0 && !isLoading
-                    anchors.centerIn: parent
-                    color: Kirigami.Theme.textColor
-                    font.pixelSize: 11
-                    font.weight: Font.Medium
-                    font.family: "Sans Serif"
-                    text: "Loading headlines..."
                 }
 
                 // Loading indicator with precise positioning
