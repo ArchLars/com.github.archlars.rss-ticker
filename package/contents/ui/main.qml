@@ -52,10 +52,10 @@ PlasmoidItem {
         console.log("[RSS-Ticker] Widget width changed to:", preferredWidgetWidth, "actual Layout.preferredWidth:", Layout.preferredWidth)
     }
 
-    // Update text formatting when hover state changes
+    // Text automatically updates through binding in headlineText
     onHoveredHeadlineIndexChanged: {
-        if (headlines.length > 0) {
-            // Force text update when hover state changes
+        // Guard against early trigger before fullRepresentation exists
+        if (typeof headlineText !== "undefined" && headlines.length > 0) {
             headlineText.text = generateFormattedText()
         }
     }
