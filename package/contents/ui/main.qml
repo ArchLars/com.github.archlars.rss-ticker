@@ -32,6 +32,7 @@ PlasmoidItem {
     property real totalTextWidth: 0
     property bool fadeInProgress: false
     property int hoveredHeadlineIndex: -1  // Track which headline is being hovered (-1 = none)
+    property int pressedHeadlineIndex: -1  // Track index pressed for more accurate clicks
 
     // Debug loading state changes
     onIsLoadingChanged: {
@@ -349,11 +350,17 @@ PlasmoidItem {
                         text: generateFormattedText()
 
                         // Enhanced mouse handling with individual headline hover detection
-                        MouseArea {
-                            id: headlineMouseArea
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            hoverEnabled: true
+                            MouseArea {
+                                id: headlineMouseArea
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                hoverEnabled: true
+
+                                onPressed: {
+                                    if (headlines.length === 0) return
+
+                                    pressedHeadlineIndex = getHeadlineIndexAtPosition(mouse.x)
+                                }
 
                             onPositionChanged: {
                                 if (containsMouse) {
@@ -370,20 +377,27 @@ PlasmoidItem {
                                     hoveredHeadlineIndex = -1
                                     console.log("[RSS-Ticker] Mouse exited, clearing hover")
                                 }
+                                pressedHeadlineIndex = -1
                             }
 
                             onClicked: function(mouse) {
                                 if (headlines.length === 0) return
 
-                                    var clickedIndex = getHeadlineIndexAtPosition(mouse.x)
-                                    if (clickedIndex !== -1) {
-                                        console.log("[RSS-Ticker] Clicked on headline", clickedIndex + 1, ":", headlines[clickedIndex].title)
-                                        openLink(headlines[clickedIndex].link)
-                                    } else if (headlines.length > 0) {
-                                        // Fallback - open first headline
-                                        console.log("[RSS-Ticker] Default click action - opening first headline")
-                                        openLink(headlines[0].link)
-                                    }
+                                var index = pressedHeadlineIndex
+                                pressedHeadlineIndex = -1
+
+                                if (index === -1) {
+                                    index = getHeadlineIndexAtPosition(mouse.x)
+                                }
+
+                                if (index !== -1) {
+                                    console.log("[RSS-Ticker] Clicked on headline", index + 1, ":", headlines[index].title)
+                                    openLink(headlines[index].link)
+                                } else if (headlines.length > 0) {
+                                    // Fallback - open first headline
+                                    console.log("[RSS-Ticker] Default click action - opening first headline")
+                                    openLink(headlines[0].link)
+                                }
                             }
                         }
                     }
