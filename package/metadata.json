@@ -1,0 +1,19 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "bumbleberrycar@gmail.com",
+                "Name": "ArchLars"
+            }
+        ],
+        "Category": "Online Services",
+        "Description": "A sleek RSS news ticker that displays today's headlines in a scrolling marquee",
+        "Icon": "rss",
+        "Id": "com.github.archlars.rss-ticker",
+        "Name": "RSS News Ticker",
+        "Version": "1.0",
+        "Website": "https://github.com/ArchLars"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "KPackageStructure": "Plasma/Applet"
+}
