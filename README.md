@@ -1,2 +1,2 @@
 # com.github.archlars.rss-ticker
-A RSS Feed widget for KDE Plasma 6
+A RSS News Feed widget for KDE Plasma 6
