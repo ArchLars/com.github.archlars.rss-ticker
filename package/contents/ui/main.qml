@@ -1,11 +1,11 @@
-import QtQuick
-import QtQuick.Layouts
-import QtQuick.Controls as QQC2
-import org.kde.plasma.plasmoid
-import org.kde.plasma.core as PlasmaCore
-import org.kde.plasma.components as PlasmaComponents3
-import org.kde.kirigami as Kirigami
-import org.kde.ksvg as KSvg
+import QtQuick 2.15
+import QtQuick.Layouts 1.15
+import QtQuick.Controls 2.15 as QQC2
+import org.kde.plasma.plasmoid 2.0
+import org.kde.plasma.core 6.0 as PlasmaCore
+import org.kde.plasma.components 3.0 as PlasmaComponents3
+import org.kde.kirigami 2.20 as Kirigami
+import org.kde.ksvg 1.0 as KSvg
 import "RSSParser.js" as RSSParser
 
 PlasmoidItem {
@@ -60,13 +60,13 @@ PlasmoidItem {
     // Text automatically updates through binding in headlineText
     onHoveredHeadlineIndexChanged: {
         // Guard against early trigger before fullRepresentation exists
-        if (typeof headlineText !== "undefined" && headlines.length > 0) {
+        if (typeof headlineText !== "undefined" && root.headlines.length > 0) {
             headlineText.text = generateFormattedText()
         }
     }
 
     toolTipMainText: "RSS News Ticker"
-    toolTipSubText: "Showing " + headlines.length + " headlines from today"
+    toolTipSubText: "Showing " + root.headlines.length + " headlines from today"
 
     Component.onCompleted: {
         console.log("[RSS-Ticker] Widget initialized")
@@ -108,12 +108,12 @@ PlasmoidItem {
     }
 
     function handleDateChange() {
-        if (fadeEnabled && !fadeInProgress && fadeOutAnimationRef) {
+        if (fadeEnabled && !root.fadeInProgress && root.fadeOutAnimationRef) {
             console.log("[RSS-Ticker] Starting fade transition for date change")
-            fadeInProgress = true
-            fadeOutAnimationRef.start()
+            root.fadeInProgress = true
+            root.fadeOutAnimationRef.start()
         } else {
-            fetchRSSFeed()
+            root.fetchRSSFeed()
         }
     }
 
@@ -133,7 +133,7 @@ PlasmoidItem {
                     parseRSSFeed(xhr.responseText)
                 } else {
                     console.log("[RSS-Ticker] Fetch failed with status:", xhr.status)
-                    headlines = []
+                    root.headlines = []
                 }
                 isLoading = false
                 console.log("[RSS-Ticker] Feed processing complete, loading indicator off")
@@ -155,11 +155,11 @@ PlasmoidItem {
         }
 
         console.log("[RSS-Ticker] Final headline count:", todayHeadlines.length)
-        headlines = todayHeadlines
+        root.headlines = todayHeadlines
 
         // Restart marquee animation
-        if (headlines.length > 0) {
-            console.log("[RSS-Ticker] Starting animation with", headlines.length, "headlines")
+        if (root.headlines.length > 0) {
+            console.log("[RSS-Ticker] Starting animation with", root.headlines.length, "headlines")
             calculateTextWidth()
             // Force immediate animation restart
             Qt.callLater(function() {
@@ -175,13 +175,13 @@ PlasmoidItem {
     }
 
     function calculateTextWidth() {
-        if (headlines.length === 0) {
+        if (root.headlines.length === 0) {
             totalTextWidth = 0
             return
         }
 
         // Create combined text to measure (plain text for width calculation)
-        var combinedText = headlines.map(function(headline) {
+        var combinedText = root.headlines.map(function(headline) {
             return headline.title
         }).join("    •    ") + "    •    "
 
@@ -190,13 +190,13 @@ PlasmoidItem {
         console.log("[RSS-Ticker] Calculated total text width:", totalTextWidth, "px")
 
         // Reset hover state when content changes
-        hoveredHeadlineIndex = -1
+        root.hoveredHeadlineIndex = -1
     }
 
     function restartAnimationWithNewSpeed() {
         console.log("[RSS-Ticker] Restarting animation with speed:", scrollSpeed, "px/s")
 
-        if (headlines.length === 0 || totalTextWidth <= 0) {
+        if (root.headlines.length === 0 || totalTextWidth <= 0) {
             console.log("[RSS-Ticker] Cannot restart animation - no content")
             return
         }
@@ -224,7 +224,7 @@ PlasmoidItem {
 
         // Use timer to ensure clean restart
         Qt.callLater(function() {
-            if (!fadeInProgress) {
+            if (!root.fadeInProgress) {
                 marqueeAnimationRef.start()
                 console.log("[RSS-Ticker] Animation restarted successfully")
             }
@@ -237,13 +237,13 @@ PlasmoidItem {
     }
 
     function getHeadlineIndexAtPosition(xPos) {
-        if (headlines.length === 0) return -1
+        if (root.headlines.length === 0) return -1
 
             var accumulatedWidth = 0
             var separator = "    •    "
 
-            for (var i = 0; i < headlines.length; i++) {
-                textMetrics.text = headlines[i].title
+            for (var i = 0; i < root.headlines.length; i++) {
+                textMetrics.text = root.headlines[i].title
                 var headlineWidth = textMetrics.width
 
                 if (xPos >= accumulatedWidth && xPos <= accumulatedWidth + headlineWidth) {
@@ -258,17 +258,17 @@ PlasmoidItem {
     }
 
     function generateFormattedText() {
-        if (headlines.length === 0) {
+        if (root.headlines.length === 0) {
             return "Loading headlines..."
         }
 
         var formattedParts = []
-        for (var i = 0; i < headlines.length; i++) {
-            var title = headlines[i].title
+        for (var i = 0; i < root.headlines.length; i++) {
+            var title = root.headlines[i].title
             // Escape HTML characters to prevent formatting issues
             title = title.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
 
-            if (hoveredHeadlineIndex === i) {
+            if (root.hoveredHeadlineIndex === i) {
                 // Use HTML to underline only the hovered headline
                 formattedParts.push('<u>' + title + '</u>')
             } else {
@@ -326,11 +326,11 @@ PlasmoidItem {
                         from: contentArea.width
                         to: -totalTextWidth
                         duration: totalTextWidth > 0 ? (totalTextWidth + contentArea.width) * 1000 / scrollSpeed : 0
-                        loops: Animation.Infinite
-                        running: headlines.length > 0 && totalTextWidth > 0 && !fadeInProgress
+                        loops: NumberAnimation.Infinite
+                        running: root.headlines.length > 0 && totalTextWidth > 0 && !root.fadeInProgress
 
                         onRunningChanged: {
-                            console.log("[RSS-Ticker] Marquee animation running:", running, "totalWidth:", totalTextWidth, "headlines:", headlines.length)
+                            console.log("[RSS-Ticker] Marquee animation running:", running, "totalWidth:", totalTextWidth, "headlines:", root.headlines.length)
                             if (running) {
                                 console.log("[RSS-Ticker] Animation started, duration:", duration, "ms")
                             }
@@ -373,7 +373,7 @@ PlasmoidItem {
                                 hoverEnabled: true
 
                                 onPressed: {
-                                    if (headlines.length === 0) return
+                                if (root.headlines.length === 0) return
 
                                     pressedHeadlineIndex = getHeadlineIndexAtPosition(mouse.x)
                                 }
@@ -381,23 +381,23 @@ PlasmoidItem {
                             onPositionChanged: {
                                 if (containsMouse) {
                                     var newHoveredIndex = getHeadlineIndexAtPosition(mouseX)
-                                    if (newHoveredIndex !== hoveredHeadlineIndex) {
-                                        hoveredHeadlineIndex = newHoveredIndex
-                                        console.log("[RSS-Ticker] Hovering over headline index:", hoveredHeadlineIndex)
+                                      if (newHoveredIndex !== root.hoveredHeadlineIndex) {
+                                          root.hoveredHeadlineIndex = newHoveredIndex
+                                        console.log("[RSS-Ticker] Hovering over headline index:", root.hoveredHeadlineIndex)
                                     }
                                 }
                             }
 
                             onExited: {
-                                if (hoveredHeadlineIndex !== -1) {
-                                    hoveredHeadlineIndex = -1
+                                  if (root.hoveredHeadlineIndex !== -1) {
+                                      root.hoveredHeadlineIndex = -1
                                     console.log("[RSS-Ticker] Mouse exited, clearing hover")
                                 }
                                 pressedHeadlineIndex = -1
                             }
 
                             onClicked: function(mouse) {
-                                if (headlines.length === 0) return
+                                if (root.headlines.length === 0) return
 
                                 var index = pressedHeadlineIndex
                                 pressedHeadlineIndex = -1
@@ -407,12 +407,12 @@ PlasmoidItem {
                                 }
 
                                 if (index !== -1) {
-                                    console.log("[RSS-Ticker] Clicked on headline", index + 1, ":", headlines[index].title)
-                                    openLink(headlines[index].link)
-                                } else if (headlines.length > 0) {
+                                    console.log("[RSS-Ticker] Clicked on headline", index + 1, ":", root.headlines[index].title)
+                                    openLink(root.headlines[index].link)
+                                } else if (root.headlines.length > 0) {
                                     // Fallback - open first headline
                                     console.log("[RSS-Ticker] Default click action - opening first headline")
-                                    openLink(headlines[0].link)
+                                    openLink(root.headlines[0].link)
                                 }
                             }
                         }
@@ -422,14 +422,14 @@ PlasmoidItem {
                 // Loading indicator with precise positioning
                 PlasmaComponents3.BusyIndicator {
                     anchors.centerIn: parent
-                    running: isLoading
-                    visible: isLoading
+                    running: root.isLoading
+                    visible: root.isLoading
                     implicitWidth: 14  // Reduced size for 27px height
                     implicitHeight: 14
                     z: 10 // Ensure it's on top
 
                     onVisibleChanged: {
-                        console.log("[RSS-Ticker] Loading indicator visible:", visible, "isLoading:", isLoading)
+                        console.log("[RSS-Ticker] Loading indicator visible:", visible, "isLoading:", root.isLoading)
                     }
                 }
             }
@@ -445,7 +445,7 @@ PlasmoidItem {
             duration: 300
             onFinished: {
                 console.log("[RSS-Ticker] Fade out complete, fetching new data")
-                fetchRSSFeed()
+                root.fetchRSSFeed()
                 fadeInAnimation.start()
             }
         }
@@ -459,7 +459,7 @@ PlasmoidItem {
             duration: 300
             onFinished: {
                 console.log("[RSS-Ticker] Fade in complete")
-                fadeInProgress = false
+                root.fadeInProgress = false
             }
         }
     }
@@ -485,7 +485,7 @@ PlasmoidItem {
             console.log("[RSS-Ticker] Speed change from", oldSpeed, "to", scrollSpeed)
 
             // Immediate synchronous restart with new speed
-            if (headlines.length > 0 && totalTextWidth > 0) {
+            if (root.headlines.length > 0 && totalTextWidth > 0) {
                 restartAnimationWithNewSpeed()
             }
         }
