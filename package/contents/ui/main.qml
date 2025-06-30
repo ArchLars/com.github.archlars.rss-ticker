@@ -165,13 +165,18 @@ PlasmoidItem {
             return
         }
 
-        // Create combined text to measure
-        var combinedText = headlines.map(function(headline) {
-            return headline.title
-        }).join("    •    ") + "    •    "
+        // Calculate total width including separators
+        var width = 0
+        for (var i = 0; i < headlines.length; i++) {
+            textMetrics.text = headlines[i].title
+            width += textMetrics.width
+            
+            // Add separator width
+            textMetrics.text = "    •    "
+            width += textMetrics.width
+        }
 
-        textMetrics.text = combinedText
-        totalTextWidth = textMetrics.width
+        totalTextWidth = width
         console.log("[RSS-Ticker] Calculated total text width:", totalTextWidth, "px")
     }
 
@@ -270,83 +275,108 @@ PlasmoidItem {
                         }
                     }
 
-                    // Headlines text with optimized vertical positioning
-                    Text {
-                        id: headlineText
-                        width: parent.width
+                    // Row layout for individual headline components
+                    Row {
+                        id: headlineRow
                         height: parent.height
-                        color: Kirigami.Theme.textColor  // Use theme-aware color
-                        font.pixelSize: 11  // Reduced for better vertical fit
-                        font.weight: Font.Medium
-                        font.family: "Sans Serif"
+                        spacing: 0
 
-                        // Critical: Use proper vertical alignment for panel widgets
-                        verticalAlignment: Text.AlignVCenter
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.verticalCenterOffset: -1  // Fine-tune vertical position
+                        // Create individual headline items
+                        Repeater {
+                            model: headlines
 
-                        // Rendering optimizations
-                        renderType: Text.NativeRendering
-                        antialiasing: true
+                            delegate: Row {
+                                height: parent.height
+                                spacing: 0
 
-                        text: headlines.length > 0 ? headlines.map(function(headline) {
-                            return headline.title
-                        }).join("    •    ") + "    •    " : "Loading headlines..."
+                                // Individual headline component
+                                Item {
+                                    height: parent.height
+                                    width: headlineTextElement.width
 
-                        // Enhanced mouse handling with proper hover feedback
-                        MouseArea {
-                            id: headlineMouseArea
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            hoverEnabled: true
+                                    Text {
+                                        id: headlineTextElement
+                                        height: parent.height
+                                        color: headlineMouseArea.containsMouse ? Qt.lighter(Kirigami.Theme.textColor, 1.2) : Kirigami.Theme.textColor
+                                        font.pixelSize: 11
+                                        font.weight: headlineMouseArea.containsMouse ? Font.DemiBold : Font.Medium
+                                        font.family: "Sans Serif"
+                                        font.underline: headlineMouseArea.containsMouse
 
-                            property bool isHovered: containsMouse
+                                        // Critical: Use proper vertical alignment
+                                        verticalAlignment: Text.AlignVCenter
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        anchors.verticalCenterOffset: -1
 
-                            onIsHoveredChanged: {
-                                console.log("[RSS-Ticker] Hover state changed:", isHovered)
-                                if (isHovered) {
-                                    // Multi-approach hover feedback
-                                    headlineText.font.underline = true
-                                    headlineText.color = Qt.lighter(Kirigami.Theme.textColor, 1.3)
-                                    headlineText.font.weight = Font.DemiBold
-                                } else {
-                                    headlineText.font.underline = false
-                                    headlineText.color = Kirigami.Theme.textColor
-                                    headlineText.font.weight = Font.Medium
-                                }
-                            }
+                                        // Rendering optimizations
+                                        renderType: Text.NativeRendering
+                                        antialiasing: true
 
-                            onClicked: function(mouse) {
-                                if (headlines.length === 0) return
+                                        text: modelData.title
 
-                                    // Calculate which headline was clicked based on position
-                                    var clickedPosition = mouse.x
-                                    var accumulatedWidth = 0
-                                    var separator = "    •    "
-
-                                    for (var i = 0; i < headlines.length; i++) {
-                                        textMetrics.text = headlines[i].title
-                                        var headlineWidth = textMetrics.width
-
-                                        if (clickedPosition >= accumulatedWidth && clickedPosition <= accumulatedWidth + headlineWidth) {
-                                            console.log("[RSS-Ticker] Clicked on headline", i + 1, ":", headlines[i].title)
-                                            openLink(headlines[i].link)
-                                            return
+                                        // Smooth transitions for hover effects
+                                        Behavior on color {
+                                            ColorAnimation { duration: 150 }
                                         }
 
-                                        accumulatedWidth += headlineWidth
-                                        textMetrics.text = separator
-                                        accumulatedWidth += textMetrics.width
-                                    }
+                                        MouseArea {
+                                            id: headlineMouseArea
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            hoverEnabled: true
 
-                                    // If we couldn't determine the exact headline, open the first one
-                                    if (headlines.length > 0) {
-                                        console.log("[RSS-Ticker] Default click action - opening first headline")
-                                        openLink(headlines[0].link)
+                                            onClicked: {
+                                                console.log("[RSS-Ticker] Clicked headline:", modelData.title)
+                                                openLink(modelData.link)
+                                            }
+                                        }
                                     }
+                                }
+
+                                // Separator (only if not the last item)
+                                Text {
+                                    visible: index < headlines.length - 1
+                                    height: parent.height
+                                    color: Kirigami.Theme.textColor
+                                    font.pixelSize: 11
+                                    font.weight: Font.Medium
+                                    font.family: "Sans Serif"
+                                    verticalAlignment: Text.AlignVCenter
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    anchors.verticalCenterOffset: -1
+                                    renderType: Text.NativeRendering
+                                    antialiasing: true
+                                    text: "    •    "
+                                }
                             }
                         }
+
+                        // Add one more separator at the end for seamless loop
+                        Text {
+                            height: parent.height
+                            color: Kirigami.Theme.textColor
+                            font.pixelSize: 11
+                            font.weight: Font.Medium
+                            font.family: "Sans Serif"
+                            verticalAlignment: Text.AlignVCenter
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.verticalCenterOffset: -1
+                            renderType: Text.NativeRendering
+                            antialiasing: true
+                            text: "    •    "
+                        }
                     }
+                }
+
+                // Loading text for when headlines are empty
+                Text {
+                    visible: headlines.length === 0 && !isLoading
+                    anchors.centerIn: parent
+                    color: Kirigami.Theme.textColor
+                    font.pixelSize: 11
+                    font.weight: Font.Medium
+                    font.family: "Sans Serif"
+                    text: "Loading headlines..."
                 }
 
                 // Loading indicator with precise positioning
