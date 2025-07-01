@@ -353,8 +353,8 @@ PlasmoidItem {
                         property: "x"
                         from: contentArea.width
                         to: -(root.singleSetWidth || totalTextWidth / 2)
-                        duration: root.singleSetWidth > 0 ? \
-                                 (root.singleSetWidth + contentArea.width) * 1000 / scrollSpeed : 0
+                        duration: root.singleSetWidth > 0 ?
+                                   (root.singleSetWidth + contentArea.width) * 1000 / scrollSpeed : 0
                         loops: Animation.Infinite
                         running: headlines.length > 0 && totalTextWidth > 0 && !fadeInProgress
 
