@@ -14,6 +14,13 @@ KCM.SimpleKCM {
     property alias kcfg_fadeEnabled: fadeEnabledCheckBox.checked
     property alias kcfg_preferredWidth: preferredWidthSpinBox.value
 
+    // cfg_* aliases satisfy generic config pages like ConfigurationShortcuts
+    property alias cfg_rssUrl: rssUrlField.text
+    property alias cfg_updateInterval: updateIntervalSpinBox.value
+    property alias cfg_scrollSpeed: scrollSpeedSpinBox.value
+    property alias cfg_fadeEnabled: fadeEnabledCheckBox.checked
+    property alias cfg_preferredWidth: preferredWidthSpinBox.value
+
     Kirigami.FormLayout {
         QQC2.TextField {
             id: rssUrlField
