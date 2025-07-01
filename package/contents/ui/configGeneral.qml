@@ -7,11 +7,12 @@ import org.kde.kcmutils as KCM
 KCM.SimpleKCM {
     id: configRoot
 
-    property alias cfg_rssUrl: rssUrlField.text
-    property alias cfg_updateInterval: updateIntervalSpinBox.value
-    property alias cfg_scrollSpeed: scrollSpeedSpinBox.value
-    property alias cfg_fadeEnabled: fadeEnabledCheckBox.checked
-    property alias cfg_preferredWidth: preferredWidthSpinBox.value
+    // kcfg_* aliases allow KConfig bindings without warnings
+    property alias kcfg_rssUrl: rssUrlField.text
+    property alias kcfg_updateInterval: updateIntervalSpinBox.value
+    property alias kcfg_scrollSpeed: scrollSpeedSpinBox.value
+    property alias kcfg_fadeEnabled: fadeEnabledCheckBox.checked
+    property alias kcfg_preferredWidth: preferredWidthSpinBox.value
 
     Kirigami.FormLayout {
         QQC2.TextField {
