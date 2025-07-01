@@ -1,11 +1,11 @@
-import QtQuick 2.0
-import QtQuick.Controls 2.3 as QtControls
-import QtQuick.Layouts 1.0
-import org.kde.kquickcontrols 2.0
-import org.kde.kirigami 2.14 as Kirigami
-import org.kde.plasma.plasmoid 2.0
+import QtQuick
+import QtQuick.Controls as QtControls
+import QtQuick.Layouts
+import org.kde.kirigami as Kirigami
+import org.kde.kcmutils as KCM
+import org.kde.plasma.plasmoid
 
-Kirigami.ScrollablePage {
+KCM.SimpleKCM {
     id: root
 
     // Dummy properties so ConfigModel can assign values without warnings
@@ -22,7 +22,7 @@ Kirigami.ScrollablePage {
         Plasmoid.globalShortcut = button.keySequence
     }
 
-    ColumnLayout {
+    Kirigami.FormLayout {
         QtControls.Label {
             Layout.fillWidth: true
             text: i18nd("plasma_shell_org.kde.plasma.desktop", "This shortcut will activate the applet as though it had been clicked.")
