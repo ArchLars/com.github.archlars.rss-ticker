@@ -185,9 +185,17 @@ PlasmoidItem {
             return headline.title
         }).join("    •    ") + "    •    "
 
-        textMetrics.text = combinedText
+        // Double the text for seamless looping
+        var doubledText = combinedText + combinedText
+
+        textMetrics.text = doubledText
         totalTextWidth = textMetrics.width
         console.log("[RSS-Ticker] Calculated total text width:", totalTextWidth, "px")
+
+        // Store single set width for animation calculations
+        textMetrics.text = combinedText
+        root.singleSetWidth = textMetrics.width
+        console.log("[RSS-Ticker] Single set width:", root.singleSetWidth, "px")
 
         // Reset hover state when content changes
         hoveredHeadlineIndex = -1
@@ -211,16 +219,19 @@ PlasmoidItem {
         // Reset position immediately
         marqueeContainerRef.x = contentAreaRef.width
 
-        // Calculate new duration with current dimensions
+        // Calculate new duration based on single set width
+        // Animation should complete when first set has fully scrolled off
         var availableWidth = contentAreaRef.width > 0 ? contentAreaRef.width : 400
-        var newDuration = Math.max(1000, (totalTextWidth + availableWidth) * 1000 / scrollSpeed)
+        var singleWidth = root.singleSetWidth || totalTextWidth / 2
+        var newDuration = Math.max(1000, (singleWidth + availableWidth) * 1000 / scrollSpeed)
 
-        console.log("[RSS-Ticker] Animation parameters - Width:", availableWidth, "Total:", totalTextWidth, "Duration:", newDuration, "ms")
+        console.log("[RSS-Ticker] Animation parameters - Width:", availableWidth,
+                    "Single set:", singleWidth, "Duration:", newDuration, "ms")
 
-        // Apply new settings and restart
+        // Apply new settings - animate only until first set scrolls off
         marqueeAnimationRef.duration = newDuration
         marqueeAnimationRef.from = availableWidth
-        marqueeAnimationRef.to = -totalTextWidth
+        marqueeAnimationRef.to = -singleWidth
 
         // Use timer to ensure clean restart
         Qt.callLater(function() {
@@ -239,22 +250,33 @@ PlasmoidItem {
     function getHeadlineIndexAtPosition(xPos) {
         if (headlines.length === 0) return -1
 
-            var accumulatedWidth = 0
-            var separator = "    •    "
+        // Adjust position to account for current scroll position
+        var adjustedX = xPos - marqueeContainerRef.x
 
-            for (var i = 0; i < headlines.length; i++) {
-                textMetrics.text = headlines[i].title
-                var headlineWidth = textMetrics.width
+        // Handle positions in both the first and second set of headlines
+        var singleWidth = root.singleSetWidth || totalTextWidth / 2
 
-                if (xPos >= accumulatedWidth && xPos <= accumulatedWidth + headlineWidth) {
-                    return i
-                }
+        // Normalize position to be within first set
+        if (adjustedX >= singleWidth) {
+            adjustedX = adjustedX % singleWidth
+        }
 
-                accumulatedWidth += headlineWidth
-                textMetrics.text = separator
-                accumulatedWidth += textMetrics.width
+        var accumulatedWidth = 0
+        var separator = "    •    "
+
+        for (var i = 0; i < headlines.length; i++) {
+            textMetrics.text = headlines[i].title
+            var headlineWidth = textMetrics.width
+
+            if (adjustedX >= accumulatedWidth && adjustedX <= accumulatedWidth + headlineWidth) {
+                return i
             }
-            return -1
+
+            accumulatedWidth += headlineWidth
+            textMetrics.text = separator
+            accumulatedWidth += textMetrics.width
+        }
+        return -1
     }
 
     function generateFormattedText() {
@@ -275,8 +297,14 @@ PlasmoidItem {
                 formattedParts.push(title)
             }
         }
-        return formattedParts.join("    •    ") + "    •    "
+
+        // Create doubled text for seamless looping
+        var singleSet = formattedParts.join("    •    ") + "    •    "
+        return singleSet + singleSet
     }
+
+    // Add property to store single set width
+    property real singleSetWidth: 0
 
     // Text metrics for width calculation - optimized font metrics
     TextMetrics {
@@ -318,14 +346,15 @@ PlasmoidItem {
                     height: parent.height
                     x: parent.width // Start off-screen to the right
 
-                    // Marquee animation with enhanced control
+                    // Marquee animation - loops when first set scrolls off
                     NumberAnimation {
                         id: marqueeAnimation
                         target: marqueeContainer
                         property: "x"
                         from: contentArea.width
-                        to: -totalTextWidth
-                        duration: totalTextWidth > 0 ? (totalTextWidth + contentArea.width) * 1000 / scrollSpeed : 0
+                        to: -(root.singleSetWidth || totalTextWidth / 2)
+                        duration: root.singleSetWidth > 0 ? \
+                                 (root.singleSetWidth + contentArea.width) * 1000 / scrollSpeed : 0
                         loops: Animation.Infinite
                         running: headlines.length > 0 && totalTextWidth > 0 && !fadeInProgress
 
@@ -380,10 +409,9 @@ PlasmoidItem {
 
                             onPositionChanged: {
                                 if (containsMouse) {
-                                    var newHoveredIndex = getHeadlineIndexAtPosition(mouseX)
+                                    var newHoveredIndex = getHeadlineIndexAtPosition(mouse.x)
                                     if (newHoveredIndex !== hoveredHeadlineIndex) {
                                         hoveredHeadlineIndex = newHoveredIndex
-                                        console.log("[RSS-Ticker] Hovering over headline index:", hoveredHeadlineIndex)
                                     }
                                 }
                             }
@@ -391,7 +419,6 @@ PlasmoidItem {
                             onExited: {
                                 if (hoveredHeadlineIndex !== -1) {
                                     hoveredHeadlineIndex = -1
-                                    console.log("[RSS-Ticker] Mouse exited, clearing hover")
                                 }
                                 pressedHeadlineIndex = -1
                             }
