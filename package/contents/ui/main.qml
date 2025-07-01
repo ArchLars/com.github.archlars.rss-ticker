@@ -401,13 +401,13 @@ PlasmoidItem {
                                 cursorShape: Qt.PointingHandCursor
                                 hoverEnabled: true
 
-                                onPressed: {
+                                onPressed: function(mouse) {
                                     if (headlines.length === 0) return
 
                                     pressedHeadlineIndex = getHeadlineIndexAtPosition(mouse.x)
                                 }
 
-                            onPositionChanged: {
+                            onPositionChanged: function(mouse) {
                                 if (containsMouse) {
                                     var newHoveredIndex = getHeadlineIndexAtPosition(mouse.x)
                                     if (newHoveredIndex !== hoveredHeadlineIndex) {
@@ -416,7 +416,7 @@ PlasmoidItem {
                                 }
                             }
 
-                            onExited: {
+                            onExited: function(mouse) {
                                 if (hoveredHeadlineIndex !== -1) {
                                     hoveredHeadlineIndex = -1
                                 }
