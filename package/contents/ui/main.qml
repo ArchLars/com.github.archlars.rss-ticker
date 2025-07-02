@@ -185,17 +185,9 @@ PlasmoidItem {
             return headline.title
         }).join("    •    ") + "    •    "
 
-        // Double the text for seamless looping
-        var doubledText = combinedText + combinedText
-
-        textMetrics.text = doubledText
+        textMetrics.text = combinedText
         totalTextWidth = textMetrics.width
         console.log("[RSS-Ticker] Calculated total text width:", totalTextWidth, "px")
-
-        // Store single set width for animation calculations
-        textMetrics.text = combinedText
-        root.singleSetWidth = textMetrics.width
-        console.log("[RSS-Ticker] Single set width:", root.singleSetWidth, "px")
 
         // Reset hover state when content changes
         hoveredHeadlineIndex = -1
@@ -219,19 +211,16 @@ PlasmoidItem {
         // Reset position immediately
         marqueeContainerRef.x = contentAreaRef.width
 
-        // Calculate new duration based on single set width
-        // Animation should complete when first set has fully scrolled off
+        // Calculate new duration with current dimensions
         var availableWidth = contentAreaRef.width > 0 ? contentAreaRef.width : 400
-        var singleWidth = root.singleSetWidth || totalTextWidth / 2
-        var newDuration = Math.max(1000, (singleWidth + availableWidth) * 1000 / scrollSpeed)
+        var newDuration = Math.max(1000, (totalTextWidth + availableWidth) * 1000 / scrollSpeed)
 
-        console.log("[RSS-Ticker] Animation parameters - Width:", availableWidth,
-                    "Single set:", singleWidth, "Duration:", newDuration, "ms")
+        console.log("[RSS-Ticker] Animation parameters - Width:", availableWidth, "Total:", totalTextWidth, "Duration:", newDuration, "ms")
 
-        // Apply new settings - animate only until first set scrolls off
+        // Apply new settings and restart
         marqueeAnimationRef.duration = newDuration
         marqueeAnimationRef.from = availableWidth
-        marqueeAnimationRef.to = -singleWidth
+        marqueeAnimationRef.to = -totalTextWidth
 
         // Use timer to ensure clean restart
         Qt.callLater(function() {
@@ -250,33 +239,22 @@ PlasmoidItem {
     function getHeadlineIndexAtPosition(xPos) {
         if (headlines.length === 0) return -1
 
-        // Adjust position to account for current scroll position
-        var adjustedX = xPos - marqueeContainerRef.x
+            var accumulatedWidth = 0
+            var separator = "    •    "
 
-        // Handle positions in both the first and second set of headlines
-        var singleWidth = root.singleSetWidth || totalTextWidth / 2
+            for (var i = 0; i < headlines.length; i++) {
+                textMetrics.text = headlines[i].title
+                var headlineWidth = textMetrics.width
 
-        // Normalize position to be within first set
-        if (adjustedX >= singleWidth) {
-            adjustedX = adjustedX % singleWidth
-        }
+                if (xPos >= accumulatedWidth && xPos <= accumulatedWidth + headlineWidth) {
+                    return i
+                }
 
-        var accumulatedWidth = 0
-        var separator = "    •    "
-
-        for (var i = 0; i < headlines.length; i++) {
-            textMetrics.text = headlines[i].title
-            var headlineWidth = textMetrics.width
-
-            if (adjustedX >= accumulatedWidth && adjustedX <= accumulatedWidth + headlineWidth) {
-                return i
+                accumulatedWidth += headlineWidth
+                textMetrics.text = separator
+                accumulatedWidth += textMetrics.width
             }
-
-            accumulatedWidth += headlineWidth
-            textMetrics.text = separator
-            accumulatedWidth += textMetrics.width
-        }
-        return -1
+            return -1
     }
 
     function generateFormattedText() {
@@ -297,14 +275,8 @@ PlasmoidItem {
                 formattedParts.push(title)
             }
         }
-
-        // Create doubled text for seamless looping
-        var singleSet = formattedParts.join("    •    ") + "    •    "
-        return singleSet + singleSet
+        return formattedParts.join("    •    ") + "    •    "
     }
-
-    // Add property to store single set width
-    property real singleSetWidth: 0
 
     // Text metrics for width calculation - optimized font metrics
     TextMetrics {
@@ -346,15 +318,14 @@ PlasmoidItem {
                     height: parent.height
                     x: parent.width // Start off-screen to the right
 
-                    // Marquee animation - loops when first set scrolls off
+                    // Marquee animation with enhanced control
                     NumberAnimation {
                         id: marqueeAnimation
                         target: marqueeContainer
                         property: "x"
                         from: contentArea.width
-                        to: -(root.singleSetWidth || totalTextWidth / 2)
-                        duration: root.singleSetWidth > 0 ?
-                                   (root.singleSetWidth + contentArea.width) * 1000 / scrollSpeed : 0
+                        to: -totalTextWidth
+                        duration: totalTextWidth > 0 ? (totalTextWidth + contentArea.width) * 1000 / scrollSpeed : 0
                         loops: Animation.Infinite
                         running: headlines.length > 0 && totalTextWidth > 0 && !fadeInProgress
 
@@ -395,30 +366,32 @@ PlasmoidItem {
                         text: generateFormattedText()
 
                         // Enhanced mouse handling with individual headline hover detection
-                            MouseArea {
-                                id: headlineMouseArea
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                hoverEnabled: true
+                        MouseArea {
+                            id: headlineMouseArea
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            hoverEnabled: true
 
-                                onPressed: function(mouse) {
-                                    if (headlines.length === 0) return
+                            onPressed: {
+                                if (headlines.length === 0) return
 
                                     pressedHeadlineIndex = getHeadlineIndexAtPosition(mouse.x)
-                                }
+                            }
 
-                            onPositionChanged: function(mouse) {
+                            onPositionChanged: {
                                 if (containsMouse) {
-                                    var newHoveredIndex = getHeadlineIndexAtPosition(mouse.x)
+                                    var newHoveredIndex = getHeadlineIndexAtPosition(mouseX)
                                     if (newHoveredIndex !== hoveredHeadlineIndex) {
                                         hoveredHeadlineIndex = newHoveredIndex
+                                        console.log("[RSS-Ticker] Hovering over headline index:", hoveredHeadlineIndex)
                                     }
                                 }
                             }
 
-                            onExited: function(mouse) {
+                            onExited: {
                                 if (hoveredHeadlineIndex !== -1) {
                                     hoveredHeadlineIndex = -1
+                                    console.log("[RSS-Ticker] Mouse exited, clearing hover")
                                 }
                                 pressedHeadlineIndex = -1
                             }
@@ -426,21 +399,21 @@ PlasmoidItem {
                             onClicked: function(mouse) {
                                 if (headlines.length === 0) return
 
-                                var index = pressedHeadlineIndex
-                                pressedHeadlineIndex = -1
+                                    var index = pressedHeadlineIndex
+                                    pressedHeadlineIndex = -1
 
-                                if (index === -1) {
-                                    index = getHeadlineIndexAtPosition(mouse.x)
-                                }
+                                    if (index === -1) {
+                                        index = getHeadlineIndexAtPosition(mouse.x)
+                                    }
 
-                                if (index !== -1) {
-                                    console.log("[RSS-Ticker] Clicked on headline", index + 1, ":", headlines[index].title)
-                                    openLink(headlines[index].link)
-                                } else if (headlines.length > 0) {
-                                    // Fallback - open first headline
-                                    console.log("[RSS-Ticker] Default click action - opening first headline")
-                                    openLink(headlines[0].link)
-                                }
+                                    if (index !== -1) {
+                                        console.log("[RSS-Ticker] Clicked on headline", index + 1, ":", headlines[index].title)
+                                        openLink(headlines[index].link)
+                                    } else if (headlines.length > 0) {
+                                        // Fallback - open first headline
+                                        console.log("[RSS-Ticker] Default click action - opening first headline")
+                                        openLink(headlines[0].link)
+                                    }
                             }
                         }
                     }
