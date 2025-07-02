@@ -326,8 +326,7 @@ PlasmoidItem {
                         from: contentArea.width
                         to: -totalTextWidth
                         duration: totalTextWidth > 0 ? (totalTextWidth + contentArea.width) * 1000 / scrollSpeed : 0
-                        loops: Animation.Infinite
-                        running: headlines.length > 0 && totalTextWidth > 0 && !fadeInProgress
+                        loops: 1
 
                         onRunningChanged: {
                             console.log("[RSS-Ticker] Marquee animation running:", running, "totalWidth:", totalTextWidth, "headlines:", headlines.length)
@@ -337,7 +336,11 @@ PlasmoidItem {
                         }
 
                         onStopped: {
-                            console.log("[RSS-Ticker] Animation stopped")
+                            console.log("[RSS-Ticker] Animation stopped - restarting for seamless loop")
+                            if (!fadeInProgress && headlines.length > 0 && totalTextWidth > 0) {
+                                marqueeContainer.x = contentArea.width
+                                marqueeAnimation.start()
+                            }
                         }
                     }
 
