@@ -30,6 +30,7 @@ PlasmoidItem {
     property bool isLoading: false
     property int currentHeadlineIndex: 0
     property real totalTextWidth: 0
+    property real cycleWidth: 0
     property bool fadeInProgress: false
     property int hoveredHeadlineIndex: -1  // Track which headline is being hovered (-1 = none)
     property int pressedHeadlineIndex: -1  // Track index pressed for more accurate clicks
@@ -61,7 +62,11 @@ PlasmoidItem {
     onHoveredHeadlineIndexChanged: {
         // Guard against early trigger before fullRepresentation exists
         if (typeof headlineText !== "undefined" && headlines.length > 0) {
-            headlineText.text = generateFormattedText()
+            var rich = generateFormattedText()
+            headlineText.text = rich
+            if (typeof headlineText2 !== "undefined") {
+                headlineText2.text = rich
+            }
         }
     }
 
@@ -187,6 +192,7 @@ PlasmoidItem {
 
         textMetrics.text = combinedText
         totalTextWidth = textMetrics.width
+        cycleWidth = totalTextWidth
         console.log("[RSS-Ticker] Calculated total text width:", totalTextWidth, "px")
 
         // Reset hover state when content changes
@@ -209,18 +215,17 @@ PlasmoidItem {
         marqueeAnimationRef.stop()
 
         // Reset position immediately
-        marqueeContainerRef.x = contentAreaRef.width
+        marqueeContainerRef.x = 0
 
         // Calculate new duration with current dimensions
-        var availableWidth = contentAreaRef.width > 0 ? contentAreaRef.width : 400
-        var newDuration = Math.max(1000, (totalTextWidth + availableWidth) * 1000 / scrollSpeed)
+        var newDuration = Math.max(1000, cycleWidth * 1000 / scrollSpeed)
 
-        console.log("[RSS-Ticker] Animation parameters - Width:", availableWidth, "Total:", totalTextWidth, "Duration:", newDuration, "ms")
+        console.log("[RSS-Ticker] Animation parameters - Cycle:", cycleWidth, "Duration:", newDuration, "ms")
 
         // Apply new settings and restart
         marqueeAnimationRef.duration = newDuration
-        marqueeAnimationRef.from = availableWidth
-        marqueeAnimationRef.to = -totalTextWidth
+        marqueeAnimationRef.from = 0
+        marqueeAnimationRef.to = -cycleWidth
 
         // Use timer to ensure clean restart
         Qt.callLater(function() {
@@ -314,32 +319,24 @@ PlasmoidItem {
                 // Scrolling headline container with precise positioning
                 Item {
                     id: marqueeContainer
-                    width: totalTextWidth
+                    width: cycleWidth * 2
                     height: parent.height
-                    x: parent.width // Start off-screen to the right
+                    x: 0
 
                     // Marquee animation with enhanced control
                     NumberAnimation {
                         id: marqueeAnimation
                         target: marqueeContainer
                         property: "x"
-                        from: contentArea.width
-                        to: -totalTextWidth
-                        duration: totalTextWidth > 0 ? (totalTextWidth + contentArea.width) * 1000 / scrollSpeed : 0
-                        loops: 1
-
+                        from: 0
+                        to: -cycleWidth
+                        duration: cycleWidth > 0 ? cycleWidth * 1000 / scrollSpeed : 0
+                        loops: Animation.Infinite
+                        
                         onRunningChanged: {
                             console.log("[RSS-Ticker] Marquee animation running:", running, "totalWidth:", totalTextWidth, "headlines:", headlines.length)
                             if (running) {
                                 console.log("[RSS-Ticker] Animation started, duration:", duration, "ms")
-                            }
-                        }
-
-                        onStopped: {
-                            console.log("[RSS-Ticker] Animation stopped - restarting for seamless loop")
-                            if (!fadeInProgress && headlines.length > 0 && totalTextWidth > 0) {
-                                marqueeContainer.x = contentArea.width
-                                marqueeAnimation.start()
                             }
                         }
                     }
@@ -347,7 +344,7 @@ PlasmoidItem {
                     // Headlines text with optimized vertical positioning
                     Text {
                         id: headlineText
-                        width: parent.width
+                        width: cycleWidth
                         height: parent.height
                         color: Kirigami.Theme.textColor  // Use theme-aware color
                         font.pixelSize: 11  // Reduced for better vertical fit
@@ -368,56 +365,75 @@ PlasmoidItem {
 
                         text: generateFormattedText()
 
-                        // Enhanced mouse handling with individual headline hover detection
-                        MouseArea {
-                            id: headlineMouseArea
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            hoverEnabled: true
+                    }
 
-                            onPressed: {
-                                if (headlines.length === 0) return
+                    Text {
+                        id: headlineText2
+                        width: cycleWidth
+                        height: parent.height
+                        x: cycleWidth
+                        color: Kirigami.Theme.textColor
+                        font.pixelSize: 11
+                        font.weight: Font.Medium
+                        font.family: "Sans Serif"
+                        verticalAlignment: Text.AlignVCenter
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.verticalCenterOffset: -1
+                        textFormat: Text.RichText
+                        renderType: Text.NativeRendering
+                        antialiasing: true
+                        text: generateFormattedText()
+                    }
 
-                                    pressedHeadlineIndex = getHeadlineIndexAtPosition(mouse.x)
-                            }
+                    // Enhanced mouse handling with individual headline hover detection
+                    MouseArea {
+                        id: headlineMouseArea
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        hoverEnabled: true
 
-                            onPositionChanged: {
-                                if (containsMouse) {
-                                    var newHoveredIndex = getHeadlineIndexAtPosition(mouseX)
-                                    if (newHoveredIndex !== hoveredHeadlineIndex) {
-                                        hoveredHeadlineIndex = newHoveredIndex
-                                        console.log("[RSS-Ticker] Hovering over headline index:", hoveredHeadlineIndex)
-                                    }
+
+                        onPressed: {
+                            if (headlines.length === 0) return
+                                pressedHeadlineIndex = getHeadlineIndexAtPosition((mouse.x + marqueeContainer.x) % cycleWidth)
+                        }
+
+                        onPositionChanged: {
+                            if (containsMouse) {
+                                var newHoveredIndex = getHeadlineIndexAtPosition((mouseX + marqueeContainer.x) % cycleWidth)
+                                if (newHoveredIndex !== hoveredHeadlineIndex) {
+                                    hoveredHeadlineIndex = newHoveredIndex
+                                    console.log("[RSS-Ticker] Hovering over headline index:", hoveredHeadlineIndex)
                                 }
                             }
+                        }
 
-                            onExited: {
-                                if (hoveredHeadlineIndex !== -1) {
-                                    hoveredHeadlineIndex = -1
-                                    console.log("[RSS-Ticker] Mouse exited, clearing hover")
-                                }
+                        onExited: {
+                            if (hoveredHeadlineIndex !== -1) {
+                                hoveredHeadlineIndex = -1
+                                console.log("[RSS-Ticker] Mouse exited, clearing hover")
+                            }
+                            pressedHeadlineIndex = -1
+                        }
+
+                        onClicked: function(mouse) {
+                            if (headlines.length === 0) return
+
+                                var index = pressedHeadlineIndex
                                 pressedHeadlineIndex = -1
-                            }
 
-                            onClicked: function(mouse) {
-                                if (headlines.length === 0) return
+                                if (index === -1) {
+                                    index = getHeadlineIndexAtPosition((mouse.x + marqueeContainer.x) % cycleWidth)
+                                }
 
-                                    var index = pressedHeadlineIndex
-                                    pressedHeadlineIndex = -1
-
-                                    if (index === -1) {
-                                        index = getHeadlineIndexAtPosition(mouse.x)
-                                    }
-
-                                    if (index !== -1) {
-                                        console.log("[RSS-Ticker] Clicked on headline", index + 1, ":", headlines[index].title)
-                                        openLink(headlines[index].link)
-                                    } else if (headlines.length > 0) {
-                                        // Fallback - open first headline
-                                        console.log("[RSS-Ticker] Default click action - opening first headline")
-                                        openLink(headlines[0].link)
-                                    }
-                            }
+                                if (index !== -1) {
+                                    console.log("[RSS-Ticker] Clicked on headline", index + 1, ":", headlines[index].title)
+                                    openLink(headlines[index].link)
+                                } else if (headlines.length > 0) {
+                                    // Fallback - open first headline
+                                    console.log("[RSS-Ticker] Default click action - opening first headline")
+                                    openLink(headlines[0].link)
+                                }
                         }
                     }
                 }
